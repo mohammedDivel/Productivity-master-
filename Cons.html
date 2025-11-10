@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Productivity Master — macOS</title>
+<style>
+:root{
+  --bg:#0f1115;--panel:#1e1e22;--muted:#9aa9bf;--accent:#007aff;--accent2:#5856d6;--text:#eaf2ff;
+  --glass: rgba(255,255,255,0.04);--border: rgba(255,255,255,0.06);--good:#30d158;--warn:#ffd60a;--danger:#ff453a;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;font-family:-apple-system, BlinkMacSystemFont, "SF Pro Text", Helvetica, Arial;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;}
+.window{max-width:1200px;margin:14px auto;padding:12px;border-radius:12px;background:linear-gradient(180deg,#111217 0%, #0e1114 100%);box-shadow:0 20px 60px rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.03)}
+.titlebar{height:36px;display:flex;align-items:center;justify-content:center;position:relative;border-bottom:1px solid rgba(255,255,255,0.02);border-top-left-radius:10px;border-top-right-radius:10px}
+.traffic{position:absolute;left:12px;display:flex;gap:8px}
+.led{width:14px;height:14px;border-radius:50%}
+.close{background:#ff5f57} .min{background:#ffbd2e} .max{background:#28ca42}
+.window-title{font-weight:600;color:var(--muted)}
+.app{padding:12px;display:flex;gap:12px}
+.left{flex:1;display:flex;flex-direction:column;gap:12px;min-width:0}
+.right{width:360px;display:flex;flex-direction:column;gap:12px}
+.card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:12px;border-radius:10px;border:1px solid var(--border);box-shadow:0 6px 18px rgba(0,0,0,0.6)}
+.row{display:flex;gap:8px;align-items:center}
+input,textarea,select,button{font-family:inherit}
+input,select,textarea{background:transparent;border:1px solid rgba(255,255,255,0.03);padding:8px;border-radius:8px;color:var(--text);width:100%}
+textarea{min-height:120px;resize:vertical}
+.btn{background:linear-gradient(90deg,var(--accent),var(--accent2));border:none;color:#062;padding:8px 10px;border-radius:8px;cursor:pointer}
+.btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.03);color:var(--muted);padding:8px;border-radius:8px;cursor:pointer}
+.small{color:var(--muted);font-size:13px}
+.check-block{background:rgba(255,255,255,0.02);padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.02)}
+.toast{position:fixed;right:18px;top:18px;background:linear-gradient(180deg,#1b1b1f,#151517);padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);display:none;z-index:9999;box-shadow:0 10px 30px rgba(0,0,0,0.6)}
+.toast.show{display:block;animation:pop .28s ease}
+@keyframes pop{from{transform:translateY(-6px);opacity:0}to{transform:translateY(0);opacity:1}}
+.warning-anim{animation:shake .6s ease}
+@keyframes shake{10%{transform:translateX(-6px)}30%{transform:translateX(6px)}50%{transform:translateX(-4px)}70%{transform:translateX(4px)}90%{transform:translateX(0)}}
+.progress{height:8px;background:rgba(255,255,255,0.03);border-radius:6px;overflow:hidden}
+.progress > i{height:100%;display:block;background:linear-gradient(90deg,var(--good),#28d27f);width:0%}
+.macro-drawer{background:rgba(255,255,255,0.02);padding:8px;border-radius:8px;max-height:160px;overflow:auto}
+.kbd{background:rgba(255,255,255,0.03);padding:4px 6px;border-radius:6px;font-family:monospace;color:var(--muted)}
+.block-overlay{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.6);padding:18px;border-radius:12px;border:2px solid rgba(255,255,255,0.03);display:none;z-index:99999;color:var(--text);text-align:center}
+@media (max-width:980px){.app{flex-direction:column}.right{width:100%}}
+</style>
+</head>
+<body>
+  <div class="window" role="application" aria-label="Productivity Master">
+    <div class="titlebar">
+      <div class="traffic" aria-hidden="true"><div class="led close"></div><div class="led min"></div><div class="led max"></div></div>
+      <div class="window-title">Productivity Master</div>
+    </div>
+
+    <div class="app">
+      <div class="left">
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div class="small">Add ticket (checklist required unless reply)</div>
+              <div style="display:flex;gap:8px;margin-top:8px">
+                <input id="ticketInput" placeholder="Paste ticket ID then press Enter" aria-label="Ticket ID" />
+                <button id="btnAdd" class="btn">Add</button>
+                <button id="btnHistory" class="btn-ghost">History</button>
+              </div>
+              <div id="ticketError" style="color:var(--danger);margin-top:8px;display:none"></div>
+            </div>
+            <div style="width:220px">
+              <div class="small">Today's required</div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">
+                <div><div id="goalCount" style="font-weight:700;font-size:20px">0</div><div class="small">tickets required</div></div>
+                <div style="width:120px">
+                  <div class="small">Progress</div>
+                  <div class="progress" style="margin-top:6px"><i id="progressBar"></i></div>
+                  <div class="small" id="progressText">0 / 0 (0%)</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:12px">
+            <strong>Checklist (quick)</strong>
+            <div class="check-block" id="prepBlock"><label><input type="checkbox" id="blk_prep"> <strong>Preparation</strong> — Zendesk open, ticket copied, previous interactions checked</label></div>
+            <div class="check-block" id="underBlock"><label><input type="checkbox" id="blk_under"> <strong>Understand</strong> — read full message, confirm issue</label></div>
+            <div class="check-block" id="resBlock"><label><input type="checkbox" id="blk_res"> <strong>Resolve & Close</strong> — notes written, tags, closure</label></div>
+
+            <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+              <button id="markAll" class="btn-ghost">Mark All Done</button>
+              <div class="small" id="checkHint">If ticket exists in history (reply), checklist will be skipped.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <strong>Email Builder & Grammar</strong>
+          <div class="small">Type reply, click Check. After grammar check, template assembles Greeting → Confirm → Solution → Closure.</div>
+
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <textarea id="emailArea" placeholder="Write reply here..."></textarea>
+            <div style="width:320px">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <div class="small">Grammar Suggestions</div>
+                <div class="row"><select id="rephraseMode" title="Rephrase mode"><option value="neutral">Neutral</option><option value="formal">Formal</option><option value="simple">Simple</option></select><button id="checkGrammar" class="btn-ghost">Check</button></div>
+              </div>
+              <div id="grammarOutput" style="margin-top:8px;max-height:220px;overflow:auto;padding:8px;border-radius:8px;background:rgba(255,255,255,0.01)"></div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+            <button id="applyTemplate" class="btn-ghost">Apply Template</button>
+            <button id="saveSnippet" class="btn-ghost">Save Snippet</button>
+            <div class="small">Snippets saved per ticket automatically.</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <strong>Log & History</strong>
+          <div class="small">Search previous tickets and reopen content.</div>
+          <div style="display:flex;gap:8px;margin-top:8px"><input id="searchBox" placeholder="Search by ticket, text..." /><select id="filterDay"><option value="">All days</option></select></div>
+          <div id="logArea" style="margin-top:10px;max-height:320px;overflow:auto"></div>
+        </div>
+      </div>
+
+      <div class="right">
+        <div class="card">
+          <strong>Quick Stats</strong>
+          <div class="small">Total tickets / This hour / Remaining this hour</div>
+          <div style="display:flex;gap:10px;margin-top:8px">
+            <div style="flex:1;background:rgba(255,255,255,0.02);padding:10px;border-radius:8px;text-align:center"><div class="small">Total</div><div id="totalTickets" style="font-weight:700;font-size:18px">0</div></div>
+            <div style="flex:1;background:rgba(255,255,255,0.02);padding:10px;border-radius:8px;text-align:center"><div class="small">This hour</div><div id="hourCount" style="font-weight:700;font-size:18px">0</div></div>
+          </div>
+          <div style="margin-top:8px;text-align:center"><div class="small">Remaining this hour</div><div id="remaining" style="font-weight:700;font-size:18px">0</div></div>
+        </div>
+
+        <div class="card">
+          <strong>Weekly Breaks & Lunch</strong>
+          <div class="small">Set Monday schedule then copy to week.</div>
+          <div style="margin-top:8px">
+            <label class="small">Weekday: <select id="daySelect"><option value="mon">Monday</option><option value="tue">Tuesday</option><option value="wed">Wednesday</option><option value="thu">Thursday</option><option value="fri">Friday</option></select></label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+              <div><div class="small">Break1 start</div><input id="b1s" type="time" /></div>
+              <div><div class="small">Break1 end</div><input id="b1e" type="time" /></div>
+              <div><div class="small">Lunch start</div><input id="ls" type="time" /></div>
+              <div><div class="small">Lunch end</div><input id="le" type="time" /></div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:8px"><button id="saveDay" class="btn">Save Day</button><button id="copyMon" class="btn-ghost">Copy Monday to Week</button></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <strong>Daily Options</strong>
+          <div class="small">Low Volume / Meetings / Work Presets</div>
+          <div style="margin-top:8px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div><div class="small">Low Volume start</div><input id="lvS" type="time" /></div>
+              <div><div class="small">Low Volume end</div><input id="lvE" type="time" /></div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:8px"><button id="saveDaily" class="btn-ghost">Save Daily</button><button id="toggleLv" class="btn-ghost">Toggle LV Today</button></div>
+            <div style="margin-top:8px"><div class="small">Meetings</div><div id="meetingsArea"></div><div style="margin-top:8px"><button id="addMeeting" class="btn-ghost">Add Meeting</button><button id="clearMeetings" class="btn-ghost">Clear</button></div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <strong>Macro Drawers</strong>
+          <div class="small">Quick access to saved content</div>
+          <div style="margin-top:8px">
+            <div class="small">Macro Drawer A</div><div id="macroA" class="macro-drawer"></div>
+            <div class="small" style="margin-top:8px">Macro Drawer B</div><div id="macroB" class="macro-drawer"></div>
+            <div class="small" style="margin-top:8px">Auto-suggestions</div><div id="macroSuggest" class="macro-drawer"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <strong>Backup & Options</strong>
+          <div class="small">Auto daily backup + IndexedDB local backup</div>
+          <div style="display:flex;gap:8px;margin-top:8px"><button id="manualBackup" class="btn-ghost">Backup Now</button><button id="restoreBtn" class="btn-ghost">Restore JSON</button></div>
+          <div style="margin-top:8px"><label class="small">Mode: <select id="modeSelect" style="width:130px"><option value="auto">Auto</option><option value="quality">Quality</option><option value="speed">Speed</option></select></label></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="blockOverlay" class="block-overlay" role="alert"><div id="blockText" style="font-weight:700;font-size:16px">Complete checklist first</div><div class="small" style="margin-top:6px">If you repeat, sound alert will play.</div></div>
+
+<script>
+/* === Storage & initialization === */
+const STORAGE_KEY = 'pm_master_full_v1';
+let store = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || {
+  version:1,
+  settings:{workHours:8},
+  weekSchedule:{},
+  daily:{},
+  meetings:[],
+  macros:{A:[],B:[],suggestions:[],greeting:"Hi {{customerName}},",confirm:"Am I correct?",closing:"Please let me know if you have any other concerns."},
+  days:{},
+  historyList:[]
+};
+function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(store)); scheduleIndexedBackup(); }
+function nowISO(){ return new Date().toISOString(); }
+function dateKey(iso){ return new Date(iso).toISOString().slice(0,10); }
+function fmtTime(iso){ const d=new Date(iso); let h=d.getHours(), m=('0'+d.getMinutes()).slice(-2), am=h>=12?'PM':'AM'; h = h%12 || 12; return `${h}:${m} ${am}`; }
+
+/* === IndexedDB backup === */
+let idb = null;
+(function initIDB(){
+  if(!window.indexedDB) return;
+  const r = indexedDB.open('pm_master_db',1);
+  r.onupgradeneeded = ()=> r.result.createObjectStore('backups',{keyPath:'k'});
+  r.onsuccess = ()=> idb = r.result;
+})();
+function scheduleIndexedBackup(){
+  if(!idb) return;
+  try{
+    const tx = idb.transaction('backups','readwrite');
+    tx.objectStore('backups').put({k:'latest', data: store});
+  }catch(e){}
+}
+
+/* === macOS-like sounds (WebAudio) === */
+class MacSounds {
+  constructor(){ try{ this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){ this.ctx = null; } }
+  _tone(freq, dur=0.12, vol=0.06){
+    if(!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    o.type = 'sine'; o.frequency.value = freq;
+    g.gain.value = vol;
+    o.connect(g); g.connect(this.ctx.destination);
+    o.start(t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    setTimeout(()=> o.stop(), dur*1000 + 20);
+  }
+  soft(){ this._tone(1000, 0.10, 0.06); }
+  alert(){ this._tone(600, 0.18, 0.12); }
+  success(){ this._tone(1400, 0.12, 0.08); }
+  error(){ this._tone(420, 0.18, 0.12); this._tone(320, 0.12, 0.08); }
+}
+const sounds = new MacSounds();
+
+/* === Notifications === */
+function notify(title, body=''){
+  try{
+    if("Notification" in window && Notification.permission === "granted"){
+      new Notification(title, { body, silent: true });
+    } else if("Notification" in window && Notification.permission !== "denied"){
+      Notification.requestPermission().then(p=>{ if(p==="granted") new Notification(title,{body,silent:true}); });
+    }
+  }catch(e){ console.warn(e); }
+}
+
+/* === UI refs === */
+const toastEl = document.getElementById('toast'), blockOverlay = document.getElementById('blockOverlay'), blockText = document.getElementById('blockText');
+const ticketInput = document.getElementById('ticketInput'), btnAdd = document.getElementById('btnAdd'), btnHistory = document.getElementById('btnHistory');
+const blk_prep = document.getElementById('blk_prep'), blk_under = document.getElementById('blk_under'), blk_res = document.getElementById('blk_res'), markAll = document.getElementById('markAll');
+const emailArea = document.getElementById('emailArea'), checkGrammar = document.getElementById('checkGrammar'), grammarOutput = document.getElementById('grammarOutput');
+const applyTemplate = document.getElementById('applyTemplate'), saveSnippet = document.getElementById('saveSnippet');
+const logArea = document.getElementById('logArea'), searchBox = document.getElementById('searchBox'), filterDay = document.getElementById('filterDay');
+const totalTicketsEl = document.getElementById('totalTickets'), hourCountEl = document.getElementById('hourCount'), remainingEl = document.getElementById('remaining');
+const macroA = document.getElementById('macroA'), macroB = document.getElementById('macroB'), macroSuggest = document.getElementById('macroSuggest');
+const goalCountEl = document.getElementById('goalCount'), progressBar = document.getElementById('progressBar'), progressText = document.getElementById('progressText');
+
+/* === Toast helper === */
+let toastTimer = null;
+function showToast(msg, ttl=3200, type='info'){
+  toastEl.innerText = msg;
+  toastEl.classList.add('show');
+  toastEl.style.display = 'block';
+  if(type==='alert') sounds.alert(); else if(type==='error') sounds.error(); else sounds.soft();
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{ toastEl.style.display='none'; toastEl.classList.remove('show'); }, ttl);
+}
+
+/* === Block overlay for preventing add === */
+let blockAttempts = 0;
+function showBlock(msg){
+  blockText.innerText = msg;
+  blockOverlay.style.display = 'block';
+  blockOverlay.classList.add('warning-anim');
+  sounds.alert();
+  setTimeout(()=>{ blockOverlay.classList.remove('warning-anim'); }, 700);
+  setTimeout(()=> blockOverlay.style.display = 'none', 1800);
+}
+
+/* === Macros render === */
+function renderMacros(){
+  macroA.innerHTML = ''; macroB.innerHTML = ''; macroSuggest.innerHTML = '';
+  (store.macros.A||[]).forEach((m,i)=>{
+    const div=document.createElement('div'); div.style.display='flex'; div.style.justifyContent='space-between'; div.style.marginBottom='6px';
+    div.innerHTML = `<div><strong>${escapeHtml(m.name)}</strong><div class="small">${escapeHtml(m.content.slice(0,80))}${m.content.length>80? '...':''}</div></div><div><button class="useMacro btn-ghost" data-d="A" data-i="${i}">Use</button></div>`;
+    macroA.appendChild(div);
+  });
+  (store.macros.B||[]).forEach((m,i)=>{
+    const div=document.createElement('div'); div.style.display='flex'; div.style.justifyContent='space-between'; div.style.marginBottom='6px';
+    div.innerHTML = `<div><strong>${escapeHtml(m.name)}</strong><div class="small">${escapeHtml(m.content.slice(0,80))}${m.content.length>80? '...':''}</div></div><div><button class="useMacro btn-ghost" data-d="B" data-i="${i}">Use</button></div>`;
+    macroB.appendChild(div);
+  });
+  (store.macros.suggestions||[]).forEach((m,i)=>{
+    const div=document.createElement('div'); div.style.display='flex'; div.style.justifyContent='space-between'; div.style.marginBottom='6px';
+    div.innerHTML = `<div><strong>${escapeHtml(m.name)}</strong><div class="small">${escapeHtml(m.content.slice(0,80))}${m.content.length>80? '...':''}</div></div><div><button class="useMacro btn-ghost" data-d="S" data-i="${i}">Use</button></div>`;
+    macroSuggest.appendChild(div);
+  });
+}
+
+/* delegate macro use */
+document.addEventListener('click', (e)=>{
+  const btn = e.target.closest('.useMacro');
+  if(!btn) return;
+  const d = btn.getAttribute('data-d'), i = parseInt(btn.getAttribute('data-i'));
+  let m = null;
+  if(d==='A') m = store.macros.A[i]; else if(d==='B') m = store.macros.B[i]; else m = store.macros.suggestions[i];
+  if(m){ emailArea.value = (emailArea.value? emailArea.value + "\n\n":"") + m.content; showToast('Macro inserted'); }
+});
+
+/* === Suggestions keywords === */
+const KEYWORDS = [
+  {k:['refund','refunds','chargeback'], name:'Refund', content:'Hi {{customer}}, I issued a refund. It will reflect in 3-10 business days.'},
+  {k:['dns','nameserver','nameservers'], name:'DNS', content:'Hi {{customer}}, please check the domain nameservers and ensure they point to the provider.'}
+];
+function updateSuggestions(text){
+  const low = (text||'').toLowerCase();
+  const found = [];
+  KEYWORDS.forEach(map=>{ map.k.forEach(kw=>{ if(low.includes(kw) && !found.includes(map)) found.push(map); }); });
+  store.macros.suggestions = found.map(f=>({name:f.name, content:f.content}));
+  renderMacros();
+}
+
+/* === Ticket logic === */
+function existsTicket(id){ return store.historyList.includes(id); }
+
+function addTicket(id){
+  if(!id){ showToast('Enter ticket ID', 3000, 'error'); return; }
+  const isReply = existsTicket(id);
+  if(!isReply){
+    if(!(blk_prep.checked && blk_under.checked && blk_res.checked)){
+      blockAttempts++;
+      if(blockAttempts===1){ showBlock('Complete the checklist before adding a ticket'); }
+      else if(blockAttempts<4){ showBlock('Checklist still incomplete — finish it'); }
+      else { showBlock('Repeated attempts detected — you cannot add ticket'); sounds.error(); }
+      return;
+    }
+  }
+  const iso = nowISO(); const k = dateKey(iso);
+  if(!store.days[k]) store.days[k] = { date: new Date(iso).toLocaleDateString(), tickets: [] };
+  const entry = { id, iso, time: fmtTime(iso), content: emailArea.value||'', isReply };
+  store.days[k].tickets.push(entry);
+  if(!store.historyList.includes(id)) store.historyList.push(id);
+  if(!isReply){ blk_prep.checked = blk_under.checked = blk_res.checked = false; }
+  emailArea.value = '';
+  save(); renderAll();
+  showToast(isReply? 'Reply logged (checklist skipped)' : 'Ticket logged', 3000, 'info');
+  notify('Ticket added', `Ticket ${id} logged`);
+  blockAttempts = 0;
+}
+
+/* wiring add */
+btnAdd.addEventListener('click', ()=> addTicket(ticketInput.value.trim()));
+ticketInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ addTicket(ticketInput.value.trim()); ticketInput.value=''; } });
+
+/* mark all */
+markAll.addEventListener('click', ()=>{ blk_prep.checked = blk_under.checked = blk_res.checked = true; showToast('Checklist marked'); });
+
+/* === render / log / stats === */
+function renderAll(){
+  // totals
+  let total = 0;
+  Object.keys(store.days).forEach(k=> total += (store.days[k].tickets||[]).length);
+  totalTicketsEl.innerText = total;
+  // goals: compute based on work hours minus non-productive minutes
+  const workHours = (store.settings && store.settings.workHours) ? store.settings.workHours : 8;
+  const nonProdH = computeNonProductiveMinutes()/60;
+  const prodH = Math.max(0, workHours - nonProdH);
+  const goal = Math.round(prodH * 4); // 4 tickets per productive hour target
+  goalCountEl.innerText = goal;
+  const progress = goal? Math.min(100, Math.round((total/goal)*100)) : 0;
+  if(progressBar) progressBar.style.width = progress + '%';
+  if(progressText) progressText.innerText = `${total} / ${goal} (${progress}%)`;
+  // hourly count
+  const tk = dateKey(nowISO());
+  const today = store.days[tk] || { tickets: [] };
+  const nowH = new Date().getHours();
+  const hourCount = today.tickets.reduce((s,t)=> s + (new Date(t.iso).getHours()===nowH?1:0), 0);
+  hourCountEl.innerText = hourCount;
+  remainingEl.innerText = Math.max(0, 4 - hourCount);
+  renderLog(); renderMacros();
+  populateFilter();
+}
+
+function renderLog(){
+  logArea.innerHTML = '';
+  const keys = Object.keys(store.days).sort((a,b)=> b.localeCompare(a));
+  if(keys.length===0){ logArea.innerHTML = '<div class="small">No tickets yet.</div>'; return; }
+  keys.forEach(k=>{
+    const day = store.days[k];
+    const header = document.createElement('div'); header.style.background = 'rgba(96,165,250,0.04)'; header.style.padding='6px'; header.style.borderRadius='6px'; header.style.margin='8px 0'; header.innerText = day.date;
+    const table = document.createElement('table'); table.style.width='100%'; table.style.borderCollapse='collapse'; table.innerHTML = '<thead><tr><th>Ticket</th><th>Time</th><th>Snippet</th><th>Reply?</th></tr></thead>';
+    const tbody = document.createElement('tbody');
+    (day.tickets||[]).forEach(t=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td><a href="#" class="openTicket" data-k="${k}" data-id="${t.id}">${escapeHtml(t.id)}</a></td><td>${escapeHtml(t.time)}</td><td style="font-family:monospace">${escapeHtml((t.content||'').slice(0,80))}</td><td>${t.isReply? 'Yes':'No'}</td>`;
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    logArea.appendChild(header); logArea.appendChild(table);
+  });
+  document.querySelectorAll('.openTicket').forEach(a=> a.addEventListener('click', e=>{ e.preventDefault(); openTicket(a.getAttribute('data-k'), a.getAttribute('data-id')); }));
+}
+
+function openTicket(k,id){
+  const t = (store.days[k].tickets||[]).find(x=> x.id===id);
+  if(!t) return;
+  emailArea.value = t.content || '';
+  showToast('Loaded ticket');
+}
+
+/* === history modal (in-file simple) === */
+const histContent = document.getElementById('histContent'), histSearch = document.getElementById('histSearch');
+if(document.getElementById('btnHistory')) document.getElementById('btnHistory').addEventListener('click', ()=>{ if(!histContent) return; renderHistory(''); alert('History opened at bottom of page (simple modal not implemented in this build). Use export to inspect JSON.'); });
+
+function renderHistory(q=''){
+  if(!histContent) return;
+  histContent.innerHTML = '';
+  const keys = Object.keys(store.days).sort((a,b)=> b.localeCompare(a));
+  keys.forEach(k=>{
+    const day = store.days[k];
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `<div style="background:rgba(96,165,250,0.04);padding:6px;border-radius:6px;margin:8px 0">${day.date}</div>`;
+    const table = document.createElement('table'); table.style.width='100%'; table.innerHTML = '<thead><tr><th>Ticket</th><th>Time</th><th>Snippet</th></tr></thead>';
+    const tbody = document.createElement('tbody');
+    (day.tickets||[]).forEach(t=>{
+      if(q && !(`${t.id} ${t.content}`.toLowerCase().includes(q.toLowerCase()))) return;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${escapeHtml(t.id)}</td><td>${escapeHtml(fmtTime(t.iso))}</td><td style="font-family:monospace">${escapeHtml((t.content||'').slice(0,120))}</td>`;
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody); wrap.appendChild(table); histContent.appendChild(wrap);
+  });
+}
+
+/* === Grammar check (local rules, light) === */
+const RULES = [
+  {regex: /\bi\b/g, fix: 'I', note: 'Capitalize I'},
+  {regex: /\bdont\b/gi, fix: "don't", note: "Use apostrophe"},
+  {regex: /\brecieve\b/gi, fix: 'receive', note: 'Spelling'}
+];
+document.getElementById('checkGrammar').addEventListener('click', ()=>{
+  const text = emailArea.value || '';
+  if(!text){ showToast('Write something first',3000,'error'); sounds.alert(); return; }
+  showToast('Checking grammar...', 1200);
+  setTimeout(()=>{
+    let out = text; const notes = [];
+    RULES.forEach(r=>{ if(r.regex.test(out)){ out = out.replace(r.regex, r.fix); notes.push(r.note); } });
+    const passive = (text.match(/\b(was|were|is|are|be)\b\s+\w+ed\b/gi) || []);
+    if(passive.length) notes.push('Possible passive voice');
+    grammarOutput.innerHTML = notes.length? notes.map(n=> `<div class="small">${escapeHtml(n)}</div>`).join('') : `<div class="small">No issues</div>`;
+    const pre = document.createElement('pre'); pre.style.whiteSpace='pre-wrap'; pre.style.marginTop='8px'; pre.style.background='rgba(0,0,0,0.12)'; pre.style.padding='8px'; pre.style.borderRadius='8px'; pre.innerText = out;
+    grammarOutput.appendChild(pre);
+    const btn = document.createElement('button'); btn.className='btn-ghost'; btn.innerText='Apply As Final Reply'; btn.addEventListener('click', ()=>{ emailArea.value = out; showToast('Applied final reply'); });
+    grammarOutput.appendChild(btn);
+    updateSuggestions(out);
+    sounds.soft();
+  }, 420);
+});
+
+/* === Template assembly & snippets === */
+applyTemplate.addEventListener('click', ()=>{
+  const g = store.macros.greeting || 'Hi {{customerName}},\nThank you for contacting support.';
+  const q = store.macros.confirm || 'Am I correct?';
+  const c = store.macros.closing || 'Please let me know if you have any other concerns.';
+  const body = emailArea.value || '';
+  emailArea.value = `${g}\n\n${q}\n\n${body}\n\n${c}`;
+  showToast('Template assembled');
+});
+saveSnippet.addEventListener('click', ()=>{
+  const txt = emailArea.value.trim(); if(!txt) return showToast('Nothing to save');
+  store.macros.A = store.macros.A || []; store.macros.A.unshift({name:'Snippet '+ new Date().toLocaleString(), content: txt});
+  if(store.macros.A.length>300) store.macros.A.length = 300;
+  save(); renderMacros(); showToast('Snippet saved');
+});
+
+/* === Backup / Export / Import === */
+document.getElementById('manualBackup').addEventListener('click', manualBackup);
+document.getElementById('restoreBtn').addEventListener('click', ()=>{
+  const inp = document.createElement('input'); inp.type='file'; inp.accept='.json'; inp.onchange = e=>{
+    const f = e.target.files[0]; if(!f) return;
+    const r = new FileReader(); r.onload = ()=>{
+      try{ const obj = JSON.parse(r.result); if(confirm('Merge with existing? OK=merge Cancel=replace')) merge(obj); else { store = obj; save(); renderAll(); showToast('Replaced store'); } }catch(err){ alert('Invalid JSON'); }
+    }; r.readAsText(f);
+  }; inp.click();
+});
+function manualBackup(){
+  const out = JSON.stringify(store, null, 2);
+  const blob = new Blob([out], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `pm_backup_${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  scheduleIndexedBackup();
+  showToast('Backup downloaded');
+}
+function merge(obj){
+  for(const k in obj.days){ if(!store.days[k]) store.days[k] = obj.days[k]; else store.days[k].tickets = (store.days[k].tickets||[]).concat(obj.days[k].tickets||[]); }
+  store.meetings = (store.meetings||[]).concat(obj.meetings||[]);
+  store.weekSchedule = Object.assign(store.weekSchedule||{}, obj.weekSchedule||{});
+  save(); renderAll(); showToast('Merged data');
+}
+
+/* === Non-productive minutes calculation (breaks, lunch, low volume, meetings) === */
+function parseTimeToDate(timeStr, ref){
+  if(!timeStr) return null;
+  const [hh, mm] = timeStr.split(':').map(x=>parseInt(x,10));
+  const r = new Date(ref); r.setHours(hh, mm, 0, 0);
+  return r;
+}
+function computeNonProductiveMinutes(){
+  const now = new Date(); const wd = ['sun','mon','tue','wed','thu','fri','sat'][now.getDay()];
+  const sched = store.weekSchedule[wd] || {};
+  let minutes = 0;
+  function add(s,e){ if(!s||!e) return; const ss=parseTimeToDate(s, now), ee=parseTimeToDate(e, now); if(ee>ss) minutes += Math.round((ee-ss)/60000); }
+  add(sched.b1s, sched.b1e); add(sched.ls, sched.le);
+  if(store.daily && store.daily.lvStart && store.daily.lvActive) add(store.daily.lvStart, store.daily.lvEnd);
+  (store.meetings||[]).forEach(m=>{ if(m.dateKey && m.dateKey !== dateKey(new Date().toISOString())) return; add(m.start, m.end); });
+  return minutes;
+}
+
+/* === Chair & Base (alerts) === */
+let lastChair = Date.now(), lastBase = Date.now();
+const CHAIR_MS = 90 * 60 * 1000; // 1.5 hour
+const BASE_MS = 15 * 60 * 1000; // 15 min check interval for pace
+setInterval(()=>{
+  renderAll();
+  checkUpcoming();
+  const now = Date.now();
+  if(now - lastChair >= CHAIR_MS){ lastChair = now; showToast('Stand up for 1 minute', 4000); sounds.soft(); }
+  if(now - lastBase >= BASE_MS){ lastBase = now; baseCheck(); }
+}, 8000);
+
+function baseCheck(){
+  const now = new Date();
+  const startDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0,0,0);
+  const elapsedH = (now - startDay)/3600000;
+  const nonProdH = computeNonProductiveMinutes()/60;
+  const prodElapsed = Math.max(0, elapsedH - nonProdH);
+  const expected = Math.floor(prodElapsed * 4); // 4 tickets per productive hour target
+  const key = dateKey(now.toISOString());
+  const actual = (store.days[key] && store.days[key].tickets) ? store.days[key].tickets.length : 0;
+  if(actual < expected){ showToast(`Behind target: ${actual}/${expected} — pick up pace`, 5000, 'alert'); notify('Behind pace', `You logged ${actual} / ${expected}`); }
+}
+
+/* upcoming notifications for breaks/meetings 5 minutes before */
+function checkUpcoming(){
+  const now = new Date(), plus5 = new Date(now.getTime() + 5*60000);
+  const wd = ['sun','mon','tue','wed','thu','fri','sat'][now.getDay()]; const sched = store.weekSchedule[wd] || {};
+  [['b1s','Break starting soon'], ['ls','Lunch starting soon']].forEach(([k,msg])=>{
+    const t = sched[k]; if(!t) return;
+    const dt = parseTimeToDate(t, now); if(dt > now && dt <= plus5){ showToast(msg, 4000); sounds.soft(); notify(msg); }
+  });
+  if(store.daily && store.daily.lvStart && store.daily.lvActive){
+    const dt = parseTimeToDate(store.daily.lvStart, now); if(dt > now && dt <= plus5){ showToast('Low volume starting soon', 4000); sounds.soft(); }
+  }
+  (store.meetings||[]).forEach(m=>{
+    const key = m.dateKey || dateKey(new Date().toISOString()); if(key !== dateKey(new Date().toISOString())) return;
+    const dt = parseTimeToDate(m.start, now); if(dt > now && dt <= plus5){ showToast('Meeting in 5 minutes', 4000); sounds.soft(); notify('Meeting', 'Meeting starting in 5 minutes'); }
+  });
+}
+
+/* === Weekly schedule save/copy === */
+document.getElementById('saveDay').addEventListener('click', ()=>{
+  const d = document.getElementById('daySelect').value;
+  store.weekSchedule = store.weekSchedule || {};
+  store.weekSchedule[d] = { b1s: document.getElementById('b1s').value, b1e: document.getElementById('b1e').value, ls: document.getElementById('ls').value, le: document.getElementById('le').value };
+  save(); showToast('Day saved');
+});
+document.getElementById('copyMon').addEventListener('click', ()=>{
+  const mon = store.weekSchedule['mon']; if(!mon) return alert('No Monday schedule saved'); ['tue','wed','thu','fri','sat','sun'].forEach(d=> store.weekSchedule[d] = Object.assign({}, mon)); save(); showToast('Copied Monday to week');
+});
+
+/* low volume / meetings */
+document.getElementById('saveDaily').addEventListener('click', ()=>{
+  const s = document.getElementById('lvS').value, e = document.getElementById('lvE').value;
+  if(!s || !e) return alert('Enter LV start and end');
+  store.daily.lvStart = s; store.daily.lvEnd = e; store.daily.lvActive = true; save(); showToast('Low volume set');
+});
+document.getElementById('toggleLv').addEventListener('click', ()=>{ store.daily.lvActive = !store.daily.lvActive; save(); showToast('Toggled LV: ' + (store.daily.lvActive ? 'ON':'OFF')); });
+document.getElementById('addMeeting').addEventListener('click', ()=>{
+  const date = prompt('Meeting date (YYYY-MM-DD) or empty for today:'), start = prompt('Start (HH:MM)'), end = prompt('End (HH:MM)');
+  if(!start || !end) return alert('Invalid'); store.meetings.push({ dateKey: date?date.trim():null, start: start.trim(), end: end.trim() }); save(); renderAll(); showToast('Meeting added');
+});
+document.getElementById('clearMeetings').addEventListener('click', ()=>{ store.meetings = []; save(); renderAll(); showToast('Cleared meetings'); });
+
+function renderMeetings(){ const area = document.getElementById('meetingsArea'); area.innerHTML = ''; (store.meetings||[]).forEach((m,i)=>{ const d = document.createElement('div'); d.className='small'; d.innerText = `${m.dateKey||'today'} ${m.start}-${m.end}`; area.appendChild(d); }); }
+
+/* === Search & filter === */
+searchBox.addEventListener('input', ()=>{ renderFiltered(searchBox.value.trim()); });
+filterDay.addEventListener('change', ()=>{ renderFiltered(''); });
+function renderFiltered(q=''){
+  const sel = filterDay.value;
+  logArea.innerHTML = '';
+  const keys = Object.keys(store.days).sort((a,b)=> b.localeCompare(a));
+  keys.forEach(k=>{
+    if(sel && sel !== k) return;
+    const day = store.days[k];
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `<div style="background:rgba(96,165,250,0.04);padding:6px;border-radius:6px;margin:8px 0">${day.date}</div>`;
+    const table = document.createElement('table'); table.style.width='100%'; table.innerHTML = '<thead><tr><th>Ticket</th><th>Time</th><th>Snippet</th></tr></thead>';
+    const tbody = document.createElement('tbody');
+    (day.tickets||[]).forEach(t=>{
+      if(q && !(`${t.id} ${t.content}`.toLowerCase().includes(q.toLowerCase()))) return;
+      const tr = document.createElement('tr'); tr.innerHTML = `<td>${escapeHtml(t.id)}</td><td>${escapeHtml(t.time)}</td><td style="font-family:monospace">${escapeHtml((t.content||'').slice(0,120))}</td>`; tbody.appendChild(tr);
+    });
+    table.appendChild(tbody); wrap.appendChild(table); logArea.appendChild(wrap);
+  });
+}
+
+/* === Utility & keyboard shortcuts === */
+document.addEventListener('keydown', e=>{ if(e.ctrlKey && e.key==='Enter'){ addTicket(ticketInput.value.trim()); ticketInput.value=''; } });
+ticketInput.addEventListener('input', ()=>{ const v = ticketInput.value.trim(); if(v && store.historyList.includes(v)) showToast('Existing ticket — reply (checklist skipped)'); });
+emailArea.addEventListener('input', ()=> updateSuggestions(emailArea.value||''));
+
+/* === Render helpers === */
+function populateFilter(){ filterDay.innerHTML = '<option value="">All days</option>'; Object.keys(store.days).sort((a,b)=> b.localeCompare(a)).forEach(k=> filterDay.innerHTML += `<option value="${k}">${store.days[k].date} (${k})</option>`); }
+function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* === Init === */
+renderAll(); renderMacros(); renderMeetings(); populateFilter();
+
+/* Save on unload */
+window.addEventListener('beforeunload', ()=> save());
+</script>
+</body>
+</html>
